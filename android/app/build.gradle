@@ -19,6 +19,9 @@ react {
     // works correctly with Expo projects.
     cliFile = new File(["node", "--print", "require.resolve('@expo/cli')"].execute(null, rootDir).text.trim())
     bundleCommand = "export:embed"
+    
+    // Disable autolinking for Expo projects (Expo handles it)
+    autolinkLibrariesWithApp = false
 
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '..'
@@ -209,5 +212,21 @@ if (reactNativeCliPath && !reactNativeCliPath.isEmpty()) {
     if (nativeModulesFile.exists()) {
         apply from: nativeModulesFile
         applyNativeModulesAppBuildGradle(project)
+    }
+}
+
+// Fix for generateAutolinkingPackageList task - make it optional for Expo projects
+tasks.whenTaskAdded { task ->
+    if (task.name == "generateAutolinkingPackageList") {
+        task.doFirst {
+            def autolinkingDir = new File(project.buildDir, "generated/autolinking")
+            autolinkingDir.mkdirs()
+            def autolinkingFile = new File(autolinkingDir, "autolinking.json")
+            if (!autolinkingFile.exists()) {
+                // Create empty autolinking.json for Expo projects (Expo handles autolinking)
+                autolinkingFile.parentFile.mkdirs()
+                autolinkingFile.write("{}")
+            }
+        }
     }
 }
