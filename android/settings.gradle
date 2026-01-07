@@ -1,10 +1,32 @@
 rootProject.name = 'MyTypingMonitor'
 
-apply from: new File(["node", "--print", "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), "../scripts/autolinking.gradle");
-useExpoModules()
+// Expo autolinking
+def expoPackageJson = ["node", "--print", "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim()
+if (expoPackageJson && !expoPackageJson.isEmpty()) {
+    def autolinkingFile = new File(expoPackageJson, "../scripts/autolinking.gradle")
+    if (autolinkingFile.exists()) {
+        apply from: autolinkingFile
+        useExpoModules()
+    }
+}
 
-apply from: new File(["node", "--print", "require.resolve('@react-native-community/cli-platform-android/package.json')"].execute(null, rootDir).text.trim(), "../native_modules.gradle");
-applyNativeModulesSettingsGradle(settings)
+// React Native autolinking (only if package exists)
+def reactNativeCliPath = ["node", "--print", "try { require.resolve('@react-native-community/cli-platform-android/package.json') } catch(e) { '' }"].execute(null, rootDir).text.trim()
+if (reactNativeCliPath && !reactNativeCliPath.isEmpty()) {
+    def nativeModulesFile = new File(reactNativeCliPath, "../native_modules.gradle")
+    if (nativeModulesFile.exists()) {
+        apply from: nativeModulesFile
+        applyNativeModulesSettingsGradle(settings)
+    }
+}
 
 include ':app'
-includeBuild(new File(["node", "--print", "require.resolve('@react-native/gradle-plugin/package.json')"].execute(null, rootDir).text.trim()).getParentFile())
+
+// React Native Gradle Plugin
+def reactNativeGradlePluginPath = ["node", "--print", "require.resolve('@react-native/gradle-plugin/package.json')"].execute(null, rootDir).text.trim()
+if (reactNativeGradlePluginPath && !reactNativeGradlePluginPath.isEmpty()) {
+    def pluginDir = new File(reactNativeGradlePluginPath).getParentFile()
+    if (pluginDir.exists()) {
+        includeBuild(pluginDir)
+    }
+}
