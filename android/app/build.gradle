@@ -19,9 +19,6 @@ react {
     // works correctly with Expo projects.
     cliFile = new File(["node", "--print", "require.resolve('@expo/cli')"].execute(null, rootDir).text.trim())
     bundleCommand = "export:embed"
-    
-    // Disable autolinking for Expo projects (Expo handles it)
-    autolinkLibrariesWithApp = false
 
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '..'
@@ -84,6 +81,7 @@ def jscFlavor = 'org.webkit:android-jsc:+'
 android {
     ndkVersion rootProject.ext.ndkVersion
 
+    compileSdk rootProject.ext.compileSdkVersion
     compileSdkVersion rootProject.ext.compileSdkVersion
 
     namespace 'com.mytypingmonitor'
