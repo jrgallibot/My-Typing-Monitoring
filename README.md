@@ -45,17 +45,21 @@ Typing → Custom Keyboard (IME) → Encrypt → SQLite → WorkManager → PDF 
 1. Install dependencies:
 ```bash
 npm install
-# or
-yarn install
 ```
 
-2. For React Native dependencies:
+2. Build with EAS (recommended):
 ```bash
-cd android
-./gradlew clean
+# Install EAS CLI if not already installed
+npm install -g eas-cli
+
+# Login to Expo
+eas login
+
+# Build APK
+eas build --profile development --platform android
 ```
 
-3. Build the APK:
+3. Alternative: Build locally with Gradle:
 ```bash
 cd android
 ./gradlew assembleRelease
