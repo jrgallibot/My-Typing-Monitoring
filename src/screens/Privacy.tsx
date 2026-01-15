@@ -1,11 +1,28 @@
 import React from 'react';
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, TouchableOpacity} from 'react-native';
+import Logo from '../components/Logo';
 
-const Privacy = () => {
+const Privacy = ({navigation}: {navigation?: {navigate?: (screen: string) => void; goBack?: () => void}}) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Privacy Notice</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation?.goBack?.() || navigation?.navigate?.('Dashboard')}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.titleContainer}>
+          <Logo size="small" showText={false} />
+          <View style={styles.titleWrapper}>
+            <Text style={styles.title}>Privacy Notice</Text>
+            <View style={styles.titleUnderline} />
+          </View>
+        </View>
+        <View style={styles.headerBadge}>
+          <Text style={styles.badgeText}>🛡️ Your Data is Secure</Text>
+        </View>
       </View>
       <View style={styles.content}>
         <Text style={styles.paragraph}>
@@ -92,34 +109,115 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#6200ee',
-    padding: 16,
-    paddingTop: 48,
+    padding: 20,
+    paddingTop: 56,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  backButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  icon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  titleWrapper: {
+    flex: 1,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
     color: '#fff',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: {width: 0, height: 2},
+    textShadowRadius: 4,
+  },
+  titleUnderline: {
+    width: 50,
+    height: 3,
+    backgroundColor: '#fff',
+    borderRadius: 2,
+    marginTop: 6,
+    opacity: 0.9,
+  },
+  headerBadge: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   content: {
     padding: 16,
   },
   paragraph: {
     fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
-    marginBottom: 16,
+    lineHeight: 26,
+    color: '#444',
+    marginBottom: 18,
+    fontWeight: '400',
   },
   section: {
     backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#6200ee',
+    marginBottom: 16,
+    letterSpacing: 0.3,
   },
   bulletPoint: {
     fontSize: 14,

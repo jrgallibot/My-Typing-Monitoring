@@ -19,16 +19,19 @@
         "ACCESS_NETWORK_STATE",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "BIND_INPUT_METHOD",
         "FOREGROUND_SERVICE",
         "RECEIVE_BOOT_COMPLETED",
-        "QUERY_ALL_PACKAGES"
+        "QUERY_ALL_PACKAGES",
+        "PACKAGE_USAGE_STATS"
       ]
     },
     "web": {},
     "plugins": [
       "expo-dev-client"
     ],
+    "scheme": "mytypingmonitor",
     "extra": {
       "eas": {
         "projectId": "b059788f-f0b6-42db-b4a7-fede235cc3fa"

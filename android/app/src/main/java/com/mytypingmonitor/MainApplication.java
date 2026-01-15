@@ -31,8 +31,8 @@ public class MainApplication extends Application implements ReactApplication {
       protected List<ReactPackage> getPackages() {
         @SuppressWarnings("UnnecessaryLocalVariable")
         List<ReactPackage> packages = new PackageList(this).getPackages();
-        // Packages that cannot be autolinked yet can be added manually here, for example:
-        // packages.add(new MyReactNativePackage());
+        // Add custom native module
+        packages.add(new com.mytypingmonitor.bridge.TypingMonitorPackage());
         return packages;
       }
 
@@ -72,6 +72,9 @@ public class MainApplication extends Application implements ReactApplication {
       ReactNativeFlipper.initializeFlipper(this, getReactNativeHost().getReactInstanceManager());
     }
     ApplicationLifecycleDispatcher.onApplicationCreate(this);
+    
+    // Initialize WorkManager for scheduled email tasks
+    com.mytypingmonitor.WorkManagerInitializer.INSTANCE.scheduleEmailTasks(this);
   }
 
   @Override

@@ -1,3 +1,4 @@
 <resources>
   <string name="app_name">MyTypingMonitor</string>
+  <string name="keyboard_name">MyTypingMonitor Keyboard</string>
 </resources>

@@ -7,8 +7,33 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# react-native-reanimated
--keep class com.swmansion.reanimated.** { *; }
--keep class com.facebook.react.turbomodule.** { *; }
+# React Native
+-keep,allowobfuscation @interface com.facebook.proguard.annotations.DoNotStrip
+-keep,allowobfuscation @interface com.facebook.proguard.annotations.KeepGettersAndSetters
+-keep @com.facebook.proguard.annotations.DoNotStrip class *
+-keepclassmembers class * {
+    @com.facebook.proguard.annotations.DoNotStrip *;
+}
+-keepclassmembers @com.facebook.proguard.annotations.KeepGettersAndSetters class * {
+  void set*(***);
+  *** get*();
+}
 
-# Add any project specific keep options here:
+# JavaMail API
+-keep class javax.mail.** { *; }
+-keep class javax.activation.** { *; }
+-keep class com.sun.mail.** { *; }
+-dontwarn javax.mail.**
+-dontwarn javax.activation.**
+
+# Room
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**
+
+# WorkManager
+-keep class androidx.work.** { *; }
+-dontwarn androidx.work.**
+
+# Keep native modules
+-keep class com.mytypingmonitor.** { *; }

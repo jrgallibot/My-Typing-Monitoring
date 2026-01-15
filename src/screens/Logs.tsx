@@ -6,10 +6,55 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import {NativeModules} from 'react-native';
+import Logo from '../components/Logo';
 
 const {TypingMonitor} = NativeModules;
+
+// Helper to check if native module is available
+const isNativeModuleAvailable = (): boolean => {
+  try {
+    return !!(
+      TypingMonitor &&
+      typeof TypingMonitor.getLogs === 'function' &&
+      typeof TypingMonitor.sendLogs === 'function'
+    );
+  } catch (e) {
+    return false;
+  }
+};
+
+// Fallback for when native module is not available
+const TypingMonitorFallback = {
+  getLogs: async () => [],
+  getStats: async () => ({
+    totalChars: 0,
+    totalLogs: 0,
+    charsPerMinute: 0,
+    mostUsedApp: null,
+    mostUsedAppCount: 0,
+    uniqueLocations: 0,
+    activeHours: {},
+  }),
+  sendLogs: async () => {
+    return Promise.reject(new Error('DEVELOPMENT_BUILD_REQUIRED'));
+  },
+};
+
+// Safely get the module with fallback
+const getTypingMonitorModule = () => {
+  try {
+    return TypingMonitor && typeof TypingMonitor.getLogs === 'function' 
+      ? TypingMonitor 
+      : TypingMonitorFallback;
+  } catch (e) {
+    return TypingMonitorFallback;
+  }
+};
+
+const TypingMonitorModule = getTypingMonitorModule();
 
 interface TypingLog {
   id: string;
@@ -21,7 +66,7 @@ interface TypingLog {
   isSent: boolean;
 }
 
-const Logs = () => {
+const Logs = ({navigation}: {navigation?: {navigate?: (screen: string) => void; goBack?: () => void}}) => {
   const [logs, setLogs] = useState<TypingLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,10 +78,13 @@ const Logs = () => {
   const loadLogs = async () => {
     try {
       setLoading(true);
-      const logsData = await TypingMonitor.getLogs();
-      setLogs(logsData);
+      const module = getTypingMonitorModule();
+      const logsData = await module.getLogs();
+      setLogs(logsData || []);
     } catch (error) {
       console.error('Error loading logs:', error);
+      setLogs([]);
+      console.warn('TypingMonitor native module not available, using fallback');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -70,8 +118,23 @@ const Logs = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Typing Logs</Text>
-        <Text style={styles.subtitle}>{logs.length} entries</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation?.goBack?.() || navigation?.navigate?.('Dashboard')}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.titleContainer}>
+          <Logo size="small" showText={false} />
+          <View style={styles.titleWrapper}>
+            <Text style={styles.title}>Typing Logs</Text>
+            <View style={styles.titleUnderline} />
+          </View>
+        </View>
+        <View style={styles.countBadge}>
+          <Text style={styles.countText}>{logs.length} entries</Text>
+        </View>
       </View>
       <FlatList
         data={logs}
@@ -133,28 +196,101 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#6200ee',
-    padding: 16,
-    paddingTop: 48,
+    padding: 20,
+    paddingTop: 56,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  backButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  icon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  titleWrapper: {
+    flex: 1,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
     color: '#fff',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: {width: 0, height: 2},
+    textShadowRadius: 4,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#fff',
-    marginTop: 4,
+  titleUnderline: {
+    width: 50,
+    height: 3,
+    backgroundColor: '#fff',
+    borderRadius: 2,
+    marginTop: 6,
     opacity: 0.9,
+  },
+  countBadge: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  countText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   logItem: {
     backgroundColor: '#fff',
-    padding: 16,
+    padding: 18,
     marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 8,
+    marginVertical: 10,
+    borderRadius: 12,
     borderLeftWidth: 4,
     borderLeftColor: '#6200ee',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   logHeader: {
     marginBottom: 8,
@@ -162,6 +298,8 @@ const styles = StyleSheet.create({
   logText: {
     fontSize: 16,
     color: '#333',
+    fontWeight: '500',
+    lineHeight: 22,
   },
   logMeta: {
     flexDirection: 'row',
