@@ -20,7 +20,7 @@ class AnalyticsEngine(private val database: AppDatabase) {
     suspend fun computeStats(startTime: Long? = null, endTime: Long? = null): TypingStats = withContext(Dispatchers.IO) {
         val dao = database.typingLogDao()
         
-        val totalChars = dao.getTotalCharacters() ?: 0L
+        val totalChars = dao.getTotalCharacters()
         val totalLogs = dao.getTotalCount()
         val mostUsedApps = dao.getMostUsedApps()
         val mostUsedApp = mostUsedApps.firstOrNull()?.appPackage

@@ -29,6 +29,13 @@ class EmailTriggerWorker(
             Log.d(TAG, "Tag: ${inputData.getString("tag")}")
             Log.d(TAG, "=========================================")
             
+            val triggerTag = inputData.getString("tag")
+            if (triggerTag == "manual_trigger") {
+                Log.d(TAG, "Manual email trigger requested")
+            } else if (triggerTag == "sync_trigger") {
+                Log.d(TAG, "Online sync email trigger requested")
+            }
+            
             val database = AppDatabase.getDatabase(applicationContext)
             val cryptoHelper = CryptoHelper(applicationContext)
             val dao = database.typingLogDao()
@@ -94,11 +101,16 @@ class EmailTriggerWorker(
 
     private fun rescheduleNextRun() {
         val tag = inputData.getString("tag") ?: return
+        if (tag == "manual_trigger" || tag == "sync_trigger") {
+            WorkManagerInitializer.scheduleEmailTasks(applicationContext)
+            Log.d(TAG, "$tag worker completed; regular email tasks are scheduled")
+            return
+        }
+
         val isNoon = tag == "noon_trigger"
         
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
-            .setRequiresBatteryNotLow(true)
             .build()
         
         val delay = if (isNoon) {
@@ -117,7 +129,7 @@ class EmailTriggerWorker(
         val workName = if (isNoon) "email_trigger_noon" else "email_trigger_midnight"
         WorkManager.getInstance(applicationContext).enqueueUniqueWork(
             workName,
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             nextWork
         )
         

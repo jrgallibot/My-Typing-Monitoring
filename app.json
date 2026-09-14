@@ -34,8 +34,9 @@
     "scheme": "mytypingmonitor",
     "extra": {
       "eas": {
-        "projectId": "b059788f-f0b6-42db-b4a7-fede235cc3fa"
+        "projectId": "b2e1f7a7-77ff-4ba6-9e24-2af798a4bfbc"
       }
-    }
+    },
+    "owner": "dswddevopscursor"
   }
 }

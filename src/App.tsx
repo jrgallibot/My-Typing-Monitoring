@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {View, StyleSheet, BackHandler, Alert} from 'react-native';
+import {View, StyleSheet, BackHandler, Alert, PermissionsAndroid, Platform} from 'react-native';
 import Dashboard from './screens/Dashboard';
 import Logs from './screens/Logs';
 import Privacy from './screens/Privacy';
@@ -8,6 +8,23 @@ type Screen = 'Dashboard' | 'Logs' | 'Privacy';
 
 const App = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>('Dashboard');
+
+  // Android 13+ requires runtime permission before app notifications can appear.
+  useEffect(() => {
+    const requestNotificationPermission = async () => {
+      if (Platform.OS !== 'android' || Platform.Version < 33) {
+        return;
+      }
+
+      try {
+        await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+      } catch (error) {
+        console.warn('Notification permission request failed:', error);
+      }
+    };
+
+    requestNotificationPermission();
+  }, []);
 
   // Handle Android back button
   useEffect(() => {
@@ -78,4 +95,3 @@ const styles = StyleSheet.create({
 });
 
 export default App;
-

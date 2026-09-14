@@ -7,10 +7,12 @@ import java.util.concurrent.TimeUnit
 import java.util.Calendar
 
 object WorkManagerInitializer {
+    private const val SYNC_WORK_NAME = "email_sync_when_online"
+    private const val SYNC_TRIGGER_TAG = "sync_trigger"
+
     fun scheduleEmailTasks(context: Context) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
-            .setRequiresBatteryNotLow(true)
             .build()
 
         val workManager = WorkManager.getInstance(context)
@@ -20,6 +22,27 @@ object WorkManagerInitializer {
         
         // Schedule for 12:00 AM (midnight)
         scheduleMidnightTask(workManager, constraints)
+
+        scheduleEmailSyncWhenOnline(context)
+    }
+
+    fun scheduleEmailSyncWhenOnline(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncWork = OneTimeWorkRequestBuilder<EmailTriggerWorker>()
+            .setConstraints(constraints)
+            .setInitialDelay(15, TimeUnit.MINUTES)
+            .addTag(SYNC_TRIGGER_TAG)
+            .setInputData(Data.Builder().putString("tag", SYNC_TRIGGER_TAG).build())
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            SYNC_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            syncWork
+        )
     }
 
     private fun scheduleNoonTask(workManager: WorkManager, constraints: Constraints) {

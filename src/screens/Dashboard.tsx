@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -7,72 +7,58 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  NativeModules,
+  Platform,
+  Linking,
 } from 'react-native';
-import {NativeModules, Platform, Linking} from 'react-native';
 import Logo from '../components/Logo';
 
 const {TypingMonitor} = NativeModules;
 
-// Helper to check if native module is available
+const emptyStats: TypingStats = {
+  totalChars: 0,
+  totalLogs: 0,
+  charsPerMinute: 0,
+  mostUsedApp: null,
+  mostUsedAppCount: 0,
+  uniqueLocations: 0,
+  activeHours: {},
+};
+
 const isNativeModuleAvailable = (): boolean => {
   try {
-    return !!(
-      TypingMonitor &&
-      typeof TypingMonitor.getStats === 'function' &&
-      typeof TypingMonitor.testSendEmail === 'function'
-    );
-  } catch (e) {
+    return !!TypingMonitor && typeof TypingMonitor.getStats === 'function';
+  } catch {
     return false;
   }
 };
 
-// Fallback for when native module is not available (Expo Go, missing native code)
 const TypingMonitorFallback = {
-  getStats: async () => ({
-    totalChars: 0,
-    totalLogs: 0,
-    charsPerMinute: 0,
-    mostUsedApp: null,
-    mostUsedAppCount: 0,
-    uniqueLocations: 0,
-    activeHours: {},
-  }),
-  getLogs: async () => [],
-  sendLogs: async () => {
-    // Don't throw, return a rejection that can be handled
-    return Promise.reject(new Error('DEVELOPMENT_BUILD_REQUIRED'));
-  },
-  testSendEmail: async () => {
-    return Promise.reject(new Error('DEVELOPMENT_BUILD_REQUIRED'));
-  },
-  triggerEmailWorker: async () => {
-    return Promise.reject(new Error('DEVELOPMENT_BUILD_REQUIRED'));
+  getStats: async () => emptyStats,
+  sendLogs: async () => Promise.reject(new Error('NATIVE_MODULE_UNAVAILABLE')),
+  testSendEmail: async () => Promise.reject(new Error('NATIVE_MODULE_UNAVAILABLE')),
+  scheduleBackgroundEmail: async () => Promise.reject(new Error('NATIVE_MODULE_UNAVAILABLE')),
+  openBatteryOptimizationSettings: () => {
+    if (Platform.OS === 'android') {
+      Linking.openSettings().catch(() => undefined);
+    }
   },
   openKeyboardSettings: () => {
     if (Platform.OS === 'android') {
-      // Try to open settings
-      try {
-        Linking.openSettings();
-      } catch (e) {
-        console.warn('Could not open settings');
-      }
+      Linking.openSettings().catch(() => undefined);
     }
   },
-  clearLogs: async () => {},
 };
 
-// Safely get the module with fallback
 const getTypingMonitorModule = () => {
   try {
-    return TypingMonitor && typeof TypingMonitor.getStats === 'function' 
-      ? TypingMonitor 
+    return TypingMonitor && typeof TypingMonitor.getStats === 'function'
+      ? TypingMonitor
       : TypingMonitorFallback;
-  } catch (e) {
+  } catch {
     return TypingMonitorFallback;
   }
 };
-
-const TypingMonitorModule = getTypingMonitorModule();
 
 interface TypingStats {
   totalChars: number;
@@ -84,10 +70,17 @@ interface TypingStats {
   activeHours: {[key: string]: number};
 }
 
-const Dashboard = ({navigation}: {navigation?: {navigate: (screen: string) => void}}) => {
-  const [stats, setStats] = useState<TypingStats | null>(null);
+type DashboardProps = {
+  navigation?: {
+    navigate: (screen: string) => void;
+  };
+};
+
+const Dashboard = ({navigation}: DashboardProps) => {
+  const [stats, setStats] = useState<TypingStats>(emptyStats);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const nativeReady = useMemo(() => isNativeModuleAvailable(), []);
 
   useEffect(() => {
     loadStats();
@@ -98,119 +91,83 @@ const Dashboard = ({navigation}: {navigation?: {navigate: (screen: string) => vo
       setLoading(true);
       const module = getTypingMonitorModule();
       const statsData = await module.getStats();
-      setStats(statsData);
+      setStats({...emptyStats, ...(statsData || {})});
     } catch (error) {
-      console.error('Error loading stats:', error);
-      // Use fallback stats if native module fails
-      setStats({
-        totalChars: 0,
-        totalLogs: 0,
-        charsPerMinute: 0,
-        mostUsedApp: null,
-        mostUsedAppCount: 0,
-        uniqueLocations: 0,
-        activeHours: {},
-      });
-      // Silent fail - don't show error if module not available
-      console.warn('TypingMonitor native module not available, using fallback');
+      console.warn('TypingMonitor stats unavailable:', error);
+      setStats(emptyStats);
     } finally {
       setLoading(false);
     }
   };
 
+  const showNativeUnavailable = () => {
+    Alert.alert(
+      'Feature not ready',
+      'The native monitor is not available in this build yet. Build and install the APK from this project, then enable the MyTypingMonitor keyboard in Android settings.',
+      [{text: 'OK'}],
+    );
+  };
+
   const handleSendLogs = async () => {
-    // Check if native module is available first
-    if (!isNativeModuleAvailable()) {
-      Alert.alert(
-        'Development Build Required',
-        'This feature requires a development build with native code.\n\n' +
-        'To use this feature:\n' +
-        '1. Run: npx expo run:android\n' +
-        '2. Or build with: eas build --profile development --platform android\n\n' +
-        'Expo Go does not support custom native modules.',
-        [{text: 'OK'}]
-      );
+    if (!nativeReady) {
+      showNativeUnavailable();
       return;
     }
 
     try {
       setSending(true);
-      const module = getTypingMonitorModule();
-      await module.sendLogs();
-      Alert.alert('Success', 'Logs report generated. Check notification to send.');
+      const result = await getTypingMonitorModule().sendLogs();
+      Alert.alert('Report sent', result || 'Your logs report was emailed successfully.');
     } catch (error: any) {
-      console.error('Error sending logs:', error);
-      if (error.message === 'DEVELOPMENT_BUILD_REQUIRED') {
-        Alert.alert(
-          'Development Build Required',
-          'This feature requires a development build.\n\n' +
-          'Run: npx expo run:android\n' +
-          'Or: eas build --profile development --platform android',
-          [{text: 'OK'}]
-        );
-      } else {
-        Alert.alert(
-          'Error',
-          error.message || 'Failed to generate logs report. Check logs for details.'
-        );
-      }
+      Alert.alert('Report failed', error?.message || 'Could not generate the logs report.');
     } finally {
       setSending(false);
     }
   };
 
   const handleOpenKeyboardSettings = () => {
+    getTypingMonitorModule().openKeyboardSettings();
+  };
+
+  const handleOpenBatterySettings = () => {
     const module = getTypingMonitorModule();
-    module.openKeyboardSettings();
+    if (typeof module.openBatteryOptimizationSettings === 'function') {
+      module.openBatteryOptimizationSettings();
+      return;
+    }
+    Linking.openSettings().catch(() => undefined);
+  };
+
+  const handleScheduleBackgroundEmail = async () => {
+    if (!nativeReady) {
+      showNativeUnavailable();
+      return;
+    }
+
+    try {
+      const module = getTypingMonitorModule();
+      if (typeof module.scheduleBackgroundEmail !== 'function') {
+        throw new Error('Please rebuild and reinstall the APK to enable background scheduling.');
+      }
+      const result = await module.scheduleBackgroundEmail();
+      Alert.alert('Background enabled', result || 'Email checks are scheduled.');
+    } catch (error: any) {
+      Alert.alert('Schedule failed', error?.message || 'Could not schedule background email checks.');
+    }
   };
 
   const handleTestEmail = async () => {
-    // Check if native module is available first
-    if (!isNativeModuleAvailable()) {
-      Alert.alert(
-        'Development Build Required',
-        'This feature requires a development build with native code.\n\n' +
-        'To test email sending:\n' +
-        '1. Run: npx expo run:android\n' +
-        '2. Or build with: eas build --profile development --platform android\n\n' +
-        'Expo Go does not support custom native modules.',
-        [{text: 'OK'}]
-      );
+    if (!nativeReady) {
+      showNativeUnavailable();
       return;
     }
 
     try {
       setSending(true);
-      const module = getTypingMonitorModule();
-      
-      // Check if testSendEmail method exists
-      if (module && typeof module.testSendEmail === 'function') {
-        const result = await module.testSendEmail();
-        Alert.alert('Test Email', result || 'Email sent! Check ffgallibot@dswd.gov.ph');
-      } else {
-        Alert.alert(
-          'Method Not Available',
-          'testSendEmail method not found. Please rebuild the app with native code.'
-        );
-      }
+      const result = await getTypingMonitorModule().testSendEmail();
+      Alert.alert('Test email', result || 'Email sent. Please check the configured inbox.');
     } catch (error: any) {
-      console.error('Error testing email:', error);
-      const errorMessage = error.message || 'Failed to send test email. Check logs for details.';
-      
-      // Check if it's the native module error
-      if (errorMessage === 'DEVELOPMENT_BUILD_REQUIRED' || 
-          errorMessage.includes('Native module not available') ||
-          errorMessage.includes('Build a development build')) {
-        Alert.alert(
-          'Development Build Required',
-          'This feature requires a development build.\n\n' +
-          'Run: npx expo run:android\n' +
-          'Or: eas build --profile development --platform android',
-          [{text: 'OK'}]
-        );
-      } else {
-        Alert.alert('Test Email Error', errorMessage);
-      }
+      Alert.alert('Email test failed', error?.message || 'Could not send the test email.');
     } finally {
       setSending(false);
     }
@@ -219,89 +176,55 @@ const Dashboard = ({navigation}: {navigation?: {navigate: (screen: string) => vo
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#6200ee" />
-        <Text style={styles.loadingText}>Loading statistics...</Text>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={styles.loadingText}>Loading dashboard...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Logo size="large" showText={true} variant="light" />
-        <Text style={styles.subtitle}>Typing Analytics Dashboard</Text>
-        <View style={styles.headerBadge}>
-          <Text style={styles.badgeText}>📊 Real-time Analytics</Text>
+        <Logo size="large" showText variant="light" />
+        <Text style={styles.subtitle}>Private typing insights for this device</Text>
+        <View style={[styles.statusPill, nativeReady ? styles.readyPill : styles.setupPill]}>
+          <Text style={styles.statusText}>{nativeReady ? 'Monitor connected' : 'Setup needed'}</Text>
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Statistics</Text>
-        {stats && (
-          <>
-            <StatCard
-              label="Total Characters"
-              value={stats.totalChars.toLocaleString()}
-            />
-            <StatCard label="Total Logs" value={stats.totalLogs.toString()} />
-            <StatCard
-              label="Characters per Minute"
-              value={stats.charsPerMinute.toString()}
-            />
-            <StatCard
-              label="Most Used App"
-              value={stats.mostUsedApp || 'N/A'}
-              subtitle={`${stats.mostUsedAppCount} logs`}
-            />
-            <StatCard
-              label="Unique Locations"
-              value={stats.uniqueLocations.toString()}
-            />
-          </>
-        )}
+      <View style={styles.overviewBand}>
+        <Text style={styles.bandLabel}>Today at a glance</Text>
+        <Text style={styles.bandValue}>{stats.totalChars.toLocaleString()}</Text>
+        <Text style={styles.bandCaption}>characters captured locally</Text>
+      </View>
+
+      <View style={styles.grid}>
+        <StatCard label="Logs" value={stats.totalLogs.toString()} tone="blue" />
+        <StatCard label="Chars/min" value={stats.charsPerMinute.toString()} tone="green" />
+        <StatCard label="Locations" value={stats.uniqueLocations.toString()} tone="orange" />
+        <StatCard
+          label="Top app"
+          value={stats.mostUsedApp || 'None'}
+          subtitle={`${stats.mostUsedAppCount} logs`}
+          tone="slate"
+        />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Actions</Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => navigation.navigate('Logs')}>
-          <Text style={styles.buttonText}>View Logs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.button}
+        <ActionButton title="View logs" detail="Review captured entries" onPress={() => navigation?.navigate('Logs')} />
+        <ActionButton title="Keyboard settings" detail="Enable the monitor keyboard" onPress={handleOpenKeyboardSettings} />
+        <ActionButton title="Background email" detail="Schedule noon and midnight sends" onPress={handleScheduleBackgroundEmail} />
+        <ActionButton title="Battery access" detail="Allow background work on this phone" onPress={handleOpenBatterySettings} />
+        <ActionButton
+          title="Send logs report"
+          detail="Email the encrypted PDF now"
           onPress={handleSendLogs}
-          disabled={sending}>
-          {sending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Send Logs Report</Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
-          onPress={handleOpenKeyboardSettings}>
-          <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-            Keyboard Settings
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
-          onPress={() => navigation.navigate('Privacy')}>
-          <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-            Privacy Notice
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.testButton]}
-          onPress={handleTestEmail}
-          disabled={sending}>
-          {sending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>🧪 Test Email Send</Text>
-          )}
-        </TouchableOpacity>
+          busy={sending}
+          primary
+        />
+        <ActionButton title="Privacy notice" detail="See how local data is handled" onPress={() => navigation?.navigate('Privacy')} />
+        <ActionButton title="Test email" detail="Check configured SMTP sending" onPress={handleTestEmail} disabled={sending} />
       </View>
     </ScrollView>
   );
@@ -311,200 +234,240 @@ const StatCard = ({
   label,
   value,
   subtitle,
+  tone,
 }: {
   label: string;
   value: string;
   subtitle?: string;
+  tone: 'blue' | 'green' | 'orange' | 'slate';
 }) => (
   <View style={styles.statCard}>
+    <View style={[styles.statAccent, accentStyles[tone]]} />
     <Text style={styles.statLabel}>{label}</Text>
-    <Text style={styles.statValue}>{value}</Text>
-    {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+      {value}
+    </Text>
+    {subtitle ? <Text style={styles.statSubtitle}>{subtitle}</Text> : null}
   </View>
 );
+
+const ActionButton = ({
+  title,
+  detail,
+  onPress,
+  busy,
+  primary,
+  disabled,
+}: {
+  title: string;
+  detail: string;
+  onPress: () => void;
+  busy?: boolean;
+  primary?: boolean;
+  disabled?: boolean;
+}) => (
+  <TouchableOpacity
+    activeOpacity={0.82}
+    style={[styles.actionButton, primary && styles.primaryAction, disabled && styles.disabledAction]}
+    onPress={onPress}
+    disabled={busy || disabled}>
+    <View style={styles.actionTextWrap}>
+      <Text style={[styles.actionTitle, primary && styles.primaryActionText]}>{title}</Text>
+      <Text style={[styles.actionDetail, primary && styles.primaryActionDetail]}>{detail}</Text>
+    </View>
+    {busy ? (
+      <ActivityIndicator color={primary ? '#fff' : '#2563eb'} />
+    ) : (
+      <Text style={[styles.actionArrow, primary && styles.primaryActionText]}>&gt;</Text>
+    )}
+  </TouchableOpacity>
+);
+
+const accentStyles = {
+  blue: {
+    backgroundColor: '#2563eb',
+  },
+  green: {
+    backgroundColor: '#16a34a',
+  },
+  orange: {
+    backgroundColor: '#ea580c',
+  },
+  slate: {
+    backgroundColor: '#475569',
+  },
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8fafc',
+  },
+  content: {
+    paddingBottom: 28,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8fafc',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    marginTop: 14,
+    fontSize: 15,
+    color: '#475569',
   },
   header: {
-    backgroundColor: '#6200ee',
-    padding: 24,
-    paddingTop: 56,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  titleContainer: {
-    flexDirection: 'row',
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 24,
+    paddingTop: 54,
+    paddingBottom: 28,
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  icon: {
-    fontSize: 32,
-  },
-  titleWrapper: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: {width: 0, height: 2},
-    textShadowRadius: 4,
-  },
-  titleUnderline: {
-    width: 60,
-    height: 4,
-    backgroundColor: '#fff',
-    borderRadius: 2,
-    marginTop: 6,
-    opacity: 0.9,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#fff',
+    color: '#cbd5e1',
+    fontSize: 15,
+    fontWeight: '600',
     marginTop: 8,
-    opacity: 0.95,
-    fontWeight: '500',
-    letterSpacing: 0.3,
+    textAlign: 'center',
   },
-  headerBadge: {
+  statusPill: {
     marginTop: 16,
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: 14,
+    borderRadius: 999,
   },
-  badgeText: {
+  readyPill: {
+    backgroundColor: '#16a34a',
+  },
+  setupPill: {
+    backgroundColor: '#ea580c',
+  },
+  statusText: {
     color: '#fff',
     fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontWeight: '800',
   },
-  section: {
-    margin: 16,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+  overviewBand: {
+    marginHorizontal: 16,
+    marginTop: 18,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderRadius: 8,
+    backgroundColor: '#2563eb',
   },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 20,
-    color: '#333',
-    letterSpacing: 0.3,
+  bandLabel: {
+    color: '#dbeafe',
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  bandValue: {
+    color: '#fff',
+    fontSize: 42,
+    fontWeight: '900',
+    marginTop: 6,
+  },
+  bandCaption: {
+    color: '#dbeafe',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
   statCard: {
-    padding: 18,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    marginBottom: 14,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6200ee',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  statLabel: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 6,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#6200ee',
-    letterSpacing: 0.5,
-  },
-  statSubtitle: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 6,
-    fontWeight: '500',
-    fontStyle: 'italic',
-  },
-  button: {
-    backgroundColor: '#6200ee',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 14,
-    shadowColor: '#6200ee',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  secondaryButton: {
+    width: '48%',
+    minHeight: 116,
+    padding: 14,
+    borderRadius: 8,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#6200ee',
+    borderColor: '#e2e8f0',
   },
-  buttonText: {
-    color: '#fff',
+  statAccent: {
+    width: 30,
+    height: 4,
+    borderRadius: 4,
+    marginBottom: 14,
+  },
+  statLabel: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  statValue: {
+    color: '#0f172a',
+    fontSize: 25,
+    fontWeight: '900',
+    marginTop: 6,
+  },
+  statSubtitle: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  section: {
+    paddingHorizontal: 16,
+    paddingTop: 22,
+  },
+  sectionTitle: {
+    color: '#0f172a',
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 12,
+  },
+  actionButton: {
+    minHeight: 68,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  primaryAction: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  disabledAction: {
+    opacity: 0.55,
+  },
+  actionTextWrap: {
+    flex: 1,
+  },
+  actionTitle: {
+    color: '#0f172a',
     fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '900',
   },
-  secondaryButtonText: {
-    color: '#6200ee',
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  actionDetail: {
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 3,
   },
-  testButton: {
-    backgroundColor: '#4caf50',
-    marginTop: 8,
+  primaryActionText: {
+    color: '#fff',
+  },
+  primaryActionDetail: {
+    color: '#dbeafe',
+  },
+  actionArrow: {
+    color: '#2563eb',
+    fontSize: 28,
+    fontWeight: '800',
+    marginLeft: 12,
   },
 });
 
 export default Dashboard;
-

@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -7,54 +7,25 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
+  NativeModules,
 } from 'react-native';
-import {NativeModules} from 'react-native';
 import Logo from '../components/Logo';
 
 const {TypingMonitor} = NativeModules;
 
-// Helper to check if native module is available
-const isNativeModuleAvailable = (): boolean => {
-  try {
-    return !!(
-      TypingMonitor &&
-      typeof TypingMonitor.getLogs === 'function' &&
-      typeof TypingMonitor.sendLogs === 'function'
-    );
-  } catch (e) {
-    return false;
-  }
-};
-
-// Fallback for when native module is not available
 const TypingMonitorFallback = {
   getLogs: async () => [],
-  getStats: async () => ({
-    totalChars: 0,
-    totalLogs: 0,
-    charsPerMinute: 0,
-    mostUsedApp: null,
-    mostUsedAppCount: 0,
-    uniqueLocations: 0,
-    activeHours: {},
-  }),
-  sendLogs: async () => {
-    return Promise.reject(new Error('DEVELOPMENT_BUILD_REQUIRED'));
-  },
 };
 
-// Safely get the module with fallback
 const getTypingMonitorModule = () => {
   try {
-    return TypingMonitor && typeof TypingMonitor.getLogs === 'function' 
-      ? TypingMonitor 
+    return TypingMonitor && typeof TypingMonitor.getLogs === 'function'
+      ? TypingMonitor
       : TypingMonitorFallback;
-  } catch (e) {
+  } catch {
     return TypingMonitorFallback;
   }
 };
-
-const TypingMonitorModule = getTypingMonitorModule();
 
 interface TypingLog {
   id: string;
@@ -66,7 +37,14 @@ interface TypingLog {
   isSent: boolean;
 }
 
-const Logs = ({navigation}: {navigation?: {navigate?: (screen: string) => void; goBack?: () => void}}) => {
+type LogsProps = {
+  navigation?: {
+    navigate?: (screen: string) => void;
+    goBack?: () => void;
+  };
+};
+
+const Logs = ({navigation}: LogsProps) => {
   const [logs, setLogs] = useState<TypingLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,13 +56,11 @@ const Logs = ({navigation}: {navigation?: {navigate?: (screen: string) => void; 
   const loadLogs = async () => {
     try {
       setLoading(true);
-      const module = getTypingMonitorModule();
-      const logsData = await module.getLogs();
-      setLogs(logsData || []);
+      const logsData = await getTypingMonitorModule().getLogs();
+      setLogs(Array.isArray(logsData) ? logsData : []);
     } catch (error) {
-      console.error('Error loading logs:', error);
+      console.warn('TypingMonitor logs unavailable:', error);
       setLogs([]);
-      console.warn('TypingMonitor native module not available, using fallback');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -97,19 +73,26 @@ const Logs = ({navigation}: {navigation?: {navigate?: (screen: string) => void; 
   };
 
   const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString();
+    if (!timestamp) {
+      return 'Unknown time';
+    }
+    return new Date(timestamp).toLocaleString();
   };
 
   const formatAppName = (packageName: string) => {
+    if (!packageName) {
+      return 'Unknown app';
+    }
     const parts = packageName.split('.');
     return parts[parts.length - 1] || packageName;
   };
 
+  const goBack = () => navigation?.goBack?.() || navigation?.navigate?.('Dashboard');
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#6200ee" />
+        <ActivityIndicator size="large" color="#2563eb" />
         <Text style={styles.loadingText}>Loading logs...</Text>
       </View>
     );
@@ -118,58 +101,47 @@ const Logs = ({navigation}: {navigation?: {navigate?: (screen: string) => void; 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation?.goBack?.() || navigation?.navigate?.('Dashboard')}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.titleContainer}>
+        <TouchableOpacity style={styles.backButton} onPress={goBack}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+        <View style={styles.titleRow}>
           <Logo size="small" showText={false} />
-          <View style={styles.titleWrapper}>
+          <View style={styles.titleBlock}>
             <Text style={styles.title}>Typing Logs</Text>
-            <View style={styles.titleUnderline} />
+            <Text style={styles.subtitle}>{logs.length} saved entries</Text>
           </View>
         </View>
-        <View style={styles.countBadge}>
-          <Text style={styles.countText}>{logs.length} entries</Text>
-        </View>
       </View>
+
       <FlatList
         data={logs}
-        keyExtractor={item => item.id}
+        keyExtractor={(item, index) => item.id || String(index)}
+        contentContainerStyle={logs.length === 0 ? styles.emptyList : styles.list}
         renderItem={({item}) => (
           <View style={styles.logItem}>
             <View style={styles.logHeader}>
-              <Text style={styles.logText}>{item.text}</Text>
+              <Text style={styles.appName}>{formatAppName(item.appPackage)}</Text>
+              {item.isSent ? <Text style={styles.sentBadge}>Sent</Text> : null}
             </View>
-            <View style={styles.logMeta}>
-              <Text style={styles.metaText}>
-                {formatAppName(item.appPackage)}
-              </Text>
-              <Text style={styles.metaText}>
-                {formatTimestamp(item.timestamp)}
-              </Text>
+            <Text style={styles.logText} numberOfLines={4}>
+              {item.text || 'No text preview'}
+            </Text>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>{formatTimestamp(item.timestamp)}</Text>
             </View>
-            {item.latitude && item.longitude && (
+            {item.latitude != null && item.longitude != null ? (
               <Text style={styles.locationText}>
-                📍 {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
+                Location {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
               </Text>
-            )}
-            {item.isSent && (
-              <Text style={styles.sentBadge}>✓ Sent</Text>
-            )}
+            ) : null}
           </View>
         )}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No logs yet</Text>
-            <Text style={styles.emptySubtext}>
-              Start typing with the MyTypingMonitor keyboard to see logs here
+            <Text style={styles.emptyTitle}>No logs yet</Text>
+            <Text style={styles.emptyText}>
+              Enable the MyTypingMonitor keyboard, type normally, then pull down to refresh.
             </Text>
           </View>
         }
@@ -181,165 +153,138 @@ const Logs = ({navigation}: {navigation?: {navigate?: (screen: string) => void; 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8fafc',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8fafc',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    marginTop: 14,
+    fontSize: 15,
+    color: '#475569',
   },
   header: {
-    backgroundColor: '#6200ee',
-    padding: 20,
-    paddingTop: 56,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    marginBottom: 16,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 18,
+    paddingTop: 52,
+    paddingBottom: 22,
   },
   backButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 16,
   },
   backButtonText: {
     color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 14,
+    fontWeight: '800',
   },
-  titleContainer: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
   },
-  icon: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  titleWrapper: {
+  titleBlock: {
+    marginLeft: 12,
     flex: 1,
   },
   title: {
+    color: '#fff',
     fontSize: 28,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: {width: 0, height: 2},
-    textShadowRadius: 4,
+    fontWeight: '900',
   },
-  titleUnderline: {
-    width: 50,
-    height: 3,
-    backgroundColor: '#fff',
-    borderRadius: 2,
-    marginTop: 6,
-    opacity: 0.9,
-  },
-  countBadge: {
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  countText: {
-    color: '#fff',
+  subtitle: {
+    color: '#cbd5e1',
     fontSize: 14,
     fontWeight: '600',
-    letterSpacing: 0.3,
+    marginTop: 2,
+  },
+  list: {
+    paddingVertical: 14,
+  },
+  emptyList: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   logItem: {
     backgroundColor: '#fff',
-    padding: 18,
+    padding: 16,
     marginHorizontal: 16,
-    marginVertical: 10,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6200ee',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    marginVertical: 7,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: '#e2e8f0',
   },
   logHeader: {
-    marginBottom: 8,
-  },
-  logText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-    lineHeight: 22,
-  },
-  logMeta: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginBottom: 10,
   },
-  metaText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  locationText: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
+  appName: {
+    color: '#2563eb',
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    flex: 1,
   },
   sentBadge: {
+    color: '#166534',
+    backgroundColor: '#dcfce7',
+    overflow: 'hidden',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
     fontSize: 12,
-    color: '#4caf50',
-    marginTop: 4,
+    fontWeight: '900',
+  },
+  logText: {
+    color: '#0f172a',
+    fontSize: 16,
     fontWeight: '600',
+    lineHeight: 23,
+  },
+  metaRow: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  metaText: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  locationText: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 5,
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 28,
     alignItems: 'center',
-    padding: 32,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
+  emptyTitle: {
+    color: '#0f172a',
+    fontSize: 22,
+    fontWeight: '900',
     marginBottom: 8,
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
+  emptyText: {
+    color: '#64748b',
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'center',
+    fontWeight: '600',
   },
 });
 
 export default Logs;
-
-

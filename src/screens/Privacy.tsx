@@ -2,241 +2,187 @@ import React from 'react';
 import {View, Text, StyleSheet, ScrollView, TouchableOpacity} from 'react-native';
 import Logo from '../components/Logo';
 
-const Privacy = ({navigation}: {navigation?: {navigate?: (screen: string) => void; goBack?: () => void}}) => {
+type PrivacyProps = {
+  navigation?: {
+    navigate?: (screen: string) => void;
+    goBack?: () => void;
+  };
+};
+
+const dataCollection = [
+  'Typed text captured only while the custom keyboard is selected.',
+  'Timestamps used for personal activity summaries.',
+  'Foreground app package names for app-level analytics.',
+  'Optional location points cached for battery-friendly reporting.',
+];
+
+const dataStorage = [
+  'Logs are stored on this device in the local database.',
+  'Sensitive values are protected with Android security features.',
+  'Reports are generated locally before you choose to share them.',
+];
+
+const dataSharing = [
+  'The app does not upload logs to a cloud service.',
+  'Email sending only uses the configured report action.',
+  'You stay in control of when reports leave the device.',
+];
+
+const Privacy = ({navigation}: PrivacyProps) => {
+  const goBack = () => navigation?.goBack?.() || navigation?.navigate?.('Dashboard');
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation?.goBack?.() || navigation?.navigate?.('Dashboard')}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.titleContainer}>
+        <TouchableOpacity style={styles.backButton} onPress={goBack}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+        <View style={styles.titleRow}>
           <Logo size="small" showText={false} />
-          <View style={styles.titleWrapper}>
+          <View style={styles.titleBlock}>
             <Text style={styles.title}>Privacy Notice</Text>
-            <View style={styles.titleUnderline} />
+            <Text style={styles.subtitle}>Local-first monitoring</Text>
           </View>
         </View>
-        <View style={styles.headerBadge}>
-          <Text style={styles.badgeText}>🛡️ Your Data is Secure</Text>
-        </View>
       </View>
-      <View style={styles.content}>
-        <Text style={styles.paragraph}>
-          MyTypingMonitor is a personal productivity application.
+
+      <View style={styles.summary}>
+        <Text style={styles.summaryTitle}>Your data stays on your device.</Text>
+        <Text style={styles.summaryText}>
+          MyTypingMonitor records activity only when its custom keyboard is selected.
+          Logs are used for personal analytics and report generation.
         </Text>
-        <Text style={styles.paragraph}>
-          This app records typing activity only when its custom keyboard is
-          selected.
-        </Text>
-        <Text style={styles.paragraph}>
-          All data is stored locally on your device and encrypted using
-          AES-256 encryption with Android Keystore.
-        </Text>
-        <Text style={styles.paragraph}>
-          No data is sent automatically without your action. Reports are only
-          generated when you manually trigger them or when scheduled tasks run
-          (12:00 PM and 12:00 AM).
-        </Text>
-        <Text style={styles.paragraph}>
-          Location data is captured only for personal analytics and is cached
-          to preserve battery life.
-        </Text>
-        <Text style={styles.paragraph}>
-          No data is shared with third parties. All logs remain on your device
-          until you choose to send them via email.
-        </Text>
-        <Text style={styles.paragraph}>
-          By using this app, you consent to local data collection for personal
-          use.
-        </Text>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Collection</Text>
-          <Text style={styles.bulletPoint}>
-            • Typed text (encrypted locally)
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • Timestamp of each keystroke
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • Foreground app package name
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • GPS location (cached, battery-optimized)
-          </Text>
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Storage</Text>
-          <Text style={styles.bulletPoint}>
-            • All data stored in local SQLite database
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • Encryption using Android Keystore
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • No cloud storage or external servers
-          </Text>
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Transmission</Text>
-          <Text style={styles.bulletPoint}>
-            • Reports only sent when you explicitly choose to send
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • Scheduled reports trigger notifications (you choose to send)
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • No automatic background transmission
-          </Text>
-        </View>
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Last updated: {new Date().toLocaleDateString()}
-          </Text>
-        </View>
       </View>
+
+      <PrivacySection title="Data collection" items={dataCollection} />
+      <PrivacySection title="Data storage" items={dataStorage} />
+      <PrivacySection title="Data sharing" items={dataSharing} />
+
+      <Text style={styles.footer}>Last updated: September 14, 2026</Text>
     </ScrollView>
   );
 };
 
+const PrivacySection = ({title, items}: {title: string; items: string[]}) => (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>{title}</Text>
+    {items.map(item => (
+      <View style={styles.itemRow} key={item}>
+        <View style={styles.itemDot} />
+        <Text style={styles.itemText}>{item}</Text>
+      </View>
+    ))}
+  </View>
+);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8fafc',
+  },
+  content: {
+    paddingBottom: 28,
   },
   header: {
-    backgroundColor: '#6200ee',
-    padding: 20,
-    paddingTop: 56,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    marginBottom: 16,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 18,
+    paddingTop: 52,
+    paddingBottom: 22,
   },
   backButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 16,
   },
   backButtonText: {
     color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 14,
+    fontWeight: '800',
   },
-  titleContainer: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
   },
-  icon: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  titleWrapper: {
+  titleBlock: {
+    marginLeft: 12,
     flex: 1,
   },
   title: {
+    color: '#fff',
     fontSize: 28,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: {width: 0, height: 2},
-    textShadowRadius: 4,
+    fontWeight: '900',
   },
-  titleUnderline: {
-    width: 50,
-    height: 3,
-    backgroundColor: '#fff',
-    borderRadius: 2,
-    marginTop: 6,
-    opacity: 0.9,
-  },
-  headerBadge: {
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 13,
+  subtitle: {
+    color: '#cbd5e1',
+    fontSize: 14,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    marginTop: 2,
   },
-  content: {
-    padding: 16,
+  summary: {
+    margin: 16,
+    padding: 18,
+    borderRadius: 8,
+    backgroundColor: '#2563eb',
   },
-  paragraph: {
-    fontSize: 16,
-    lineHeight: 26,
-    color: '#444',
-    marginBottom: 18,
-    fontWeight: '400',
+  summaryTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  summaryText: {
+    color: '#dbeafe',
+    fontSize: 15,
+    lineHeight: 23,
+    fontWeight: '600',
   },
   section: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 8,
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: '#e2e8f0',
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#6200ee',
-    marginBottom: 16,
-    letterSpacing: 0.3,
+    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 12,
   },
-  bulletPoint: {
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  itemDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#2563eb',
+    marginTop: 7,
+    marginRight: 10,
+  },
+  itemText: {
+    flex: 1,
+    color: '#475569',
     fontSize: 14,
     lineHeight: 22,
-    color: '#666',
-    marginBottom: 8,
-    marginLeft: 8,
+    fontWeight: '600',
   },
   footer: {
-    marginTop: 32,
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  footerText: {
+    color: '#64748b',
     fontSize: 12,
-    color: '#999',
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 12,
   },
 });
 
 export default Privacy;
-
-

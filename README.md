@@ -47,7 +47,25 @@ Typing → Custom Keyboard (IME) → Encrypt → SQLite → WorkManager → PDF 
 npm install
 ```
 
-2. Build with EAS (recommended):
+2. Build the APK:
+
+### Option A: Build Locally (Without Expo)
+
+See [BUILD_APK_LOCALLY.md](./BUILD_APK_LOCALLY.md) for detailed instructions.
+
+Quick build:
+```bash
+# Bundle React Native
+npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
+# Build APK
+cd android
+.\gradlew.bat assembleDebug
+```
+
+The APK will be at: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+### Option B: Build with EAS (Expo Cloud Build)
 ```bash
 # Install EAS CLI if not already installed
 npm install -g eas-cli
@@ -71,6 +89,20 @@ android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Configuration
+
+### Environment Variables
+
+Create a `.env` file in the project root with your SMTP email configuration:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@example.com
+SMTP_PASSWORD=your-app-password
+SMTP_TO_EMAIL=recipient@example.com
+```
+
+**Note**: The `.env` file is gitignored for security. Copy `.env.example` to `.env` and fill in your credentials.
 
 ### Permissions
 

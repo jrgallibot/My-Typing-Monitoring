@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "test": "jest",
     "lint": "eslint .",
-    "build:android": "eas build --platform android"
+    "build:android": "eas build --platform android",
+    "build:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build-apk.ps1"
   },
   "dependencies": {
     "@react-navigation/native": "^6.1.9",
@@ -29,7 +30,9 @@
     "@babel/core": "^7.20.0",
     "@babel/preset-env": "^7.20.0",
     "@babel/runtime": "^7.20.0",
+    "@react-native-community/cli": "^20.1.0",
     "@react-native/eslint-config": "^0.72.2",
+    "@react-native/metro-config": "^0.83.1",
     "@tsconfig/react-native": "^3.0.0",
     "@types/react": "~19.1.10",
     "@types/react-test-renderer": "^19.0.0",

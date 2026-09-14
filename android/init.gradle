@@ -1,0 +1,14 @@
+// Init script to configure expo-dev-launcher's buildscript repositories
+// This runs before any project buildscript is evaluated
+
+gradle.beforeProject { project ->
+    if (project.name.contains('expo-dev-launcher') || project.path.contains('expo-dev-launcher')) {
+        project.buildscript.repositories {
+            google()
+            mavenCentral()
+            gradlePluginPortal()
+            maven { url 'https://plugins.gradle.org/m2/' }
+        }
+    }
+}
+

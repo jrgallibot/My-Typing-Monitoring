@@ -60,6 +60,11 @@ yarn-error.log
 *.apk
 !debug.apk
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
 
 
 

@@ -1,8 +1,11 @@
 package com.mytypingmonitor.bridge
 
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import com.facebook.react.bridge.*
+import com.mytypingmonitor.WorkManagerInitializer
 import com.mytypingmonitor.db.AppDatabase
 import com.mytypingmonitor.pdf.PdfGenerator
 import com.mytypingmonitor.crypto.CryptoHelper
@@ -88,8 +91,31 @@ class TypingMonitorModule(reactContext: ReactApplicationContext) : ReactContextB
         scope.launch {
             try {
                 val pdfFile = pdfGenerator.generateReport()
-                notificationHelper.showLogsReadyNotification(pdfFile.absolutePath)
-                promise.resolve(pdfFile.absolutePath)
+                val subject = "MyTypingMonitor - Typing Logs Report"
+                val body = """
+                    Typing Logs Report
+
+                    Report generated at: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}
+
+                    Please find the encrypted PDF report attached.
+                """.trimIndent()
+
+                val emailSent = com.mytypingmonitor.email.EmailSender.sendEmailWithAttachment(
+                    subject = subject,
+                    body = body,
+                    attachmentPath = pdfFile.absolutePath
+                )
+
+                if (emailSent) {
+                    val unsentLogs = database.typingLogDao().getRecentLogs(10000).filter { !it.isSent }
+                    if (unsentLogs.isNotEmpty()) {
+                        database.typingLogDao().markAsSent(unsentLogs.map { it.id })
+                    }
+                    promise.resolve("Email sent successfully.")
+                } else {
+                    notificationHelper.showLogsReadyNotification(pdfFile.absolutePath)
+                    promise.reject("EMAIL_ERROR", "Email failed. A local report notification was created if notifications are allowed.")
+                }
             } catch (e: Exception) {
                 promise.reject("ERROR", e.message, e)
             }
@@ -101,6 +127,29 @@ class TypingMonitorModule(reactContext: ReactApplicationContext) : ReactContextB
         val intent = Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         reactApplicationContext.startActivity(intent)
+    }
+
+    @ReactMethod
+    fun openBatteryOptimizationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:${reactApplicationContext.packageName}")
+            }
+        } else {
+            Intent(Settings.ACTION_SETTINGS)
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        reactApplicationContext.startActivity(intent)
+    }
+
+    @ReactMethod
+    fun scheduleBackgroundEmail(promise: Promise) {
+        try {
+            WorkManagerInitializer.scheduleEmailTasks(reactApplicationContext)
+            promise.resolve("Background email checks scheduled for 12:00 PM and 12:00 AM.")
+        } catch (e: Exception) {
+            promise.reject("SCHEDULE_ERROR", e.message, e)
+        }
     }
 
     @ReactMethod

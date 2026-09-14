@@ -1,40 +1,203 @@
 apply plugin: "com.android.application"
 apply plugin: "com.facebook.react"
 apply plugin: "kotlin-android"
-apply plugin: "kotlin-kapt"
+apply plugin: "com.google.devtools.ksp"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
-// Create autolinking.json file to satisfy React Native plugin requirements
-def getAutolinkingFile = {
-    def buildDir = project.hasProperty('buildDir') ? project.buildDir : new File(project.projectDir, "build")
-    def autolinkingDir = new File(buildDir, "generated/autolinking")
-    autolinkingDir.mkdirs()
-    return new File(autolinkingDir, "autolinking.json")
+// CRITICAL FIX: Create autolinking.json file BEFORE React Native plugin configures tasks
+// The plugin validates the file during task configuration, so we must create it synchronously
+// We'll create it in multiple places to ensure it exists
+
+// Helper function to create the file
+def ensureAutolinkingFile = {
+    // Try multiple buildDir locations
+    def buildDirs = [
+        project.hasProperty('buildDir') ? project.buildDir : null,
+        new File(project.projectDir, "build"),
+        new File(rootProject.projectDir, "build"),
+    ].findAll { it != null }
+    
+    buildDirs.each { bd ->
+        try {
+            def autolinkingDir = new File(bd, "generated/autolinking")
+            autolinkingDir.mkdirs()
+            def autolinkingFile = new File(autolinkingDir, "autolinking.json")
+            if (!autolinkingFile.exists()) {
+                autolinkingFile.parentFile.mkdirs()
+                autolinkingFile.write("{}")
+            }
+        } catch (e) {
+            // Ignore errors, try next location
+        }
+    }
 }
 
-// Create file immediately after plugin is applied
-def autolinkingFile = getAutolinkingFile()
-if (!autolinkingFile.exists()) {
-    autolinkingFile.parentFile.mkdirs()
-    autolinkingFile.write("{}")
+// Create file immediately during script evaluation (BEFORE plugin applies)
+ensureAutolinkingFile()
+
+// Create file in gradle.projectsEvaluated (runs very early)
+gradle.projectsEvaluated {
+    ensureAutolinkingFile()
 }
 
-// Ensure file exists when task is added
+// Create file when task is added (as soon as task is registered)
+// For Expo projects, completely override the task to prevent React Native config reading
 tasks.whenTaskAdded { task ->
     if (task.name == "generateAutolinkingPackageList") {
-        def file = getAutolinkingFile()
-        if (!file.exists()) {
-            file.parentFile.mkdirs()
-            file.write("{}")
-        }
-        task.doFirst {
-            def backupFile = getAutolinkingFile()
-            if (!backupFile.exists()) {
-                backupFile.parentFile.mkdirs()
-                backupFile.write("{}")
+        ensureAutolinkingFile()
+        
+        // Check if this is an Expo project
+        def isExpoProject = new File(rootProject.projectDir, "node_modules/expo").exists() ||
+                           new File(project.projectDir, "../node_modules/expo").exists() ||
+                           new File(rootProject.projectDir, "../node_modules/expo").exists()
+        
+        if (isExpoProject) {
+            // For Expo projects, completely replace all task actions
+            // This prevents the React Native plugin from trying to read react-native config
+            task.actions.clear()
+            
+            // Create the autolinking.json file with package name
+            task.doFirst {
+                ensureAutolinkingFile()
+                def buildDir = project.buildDir
+                def autolinkingFile = new File(buildDir, "generated/autolinking/autolinking.json")
+                
+                try {
+                    def packageName = android.defaultConfig.applicationId
+                    def config = """{
+  "project": {
+    "android": {
+      "packageName": "${packageName}"
+    }
+  },
+  "dependencies": {}
+}"""
+                    autolinkingFile.parentFile.mkdirs()
+                    autolinkingFile.write(config)
+                    logger.lifecycle("✅ Created autolinking.json for Expo project with package: ${packageName}")
+                } catch (e) {
+                    logger.warn("Could not create autolinking.json with package name: ${e.message}")
+                    if (!autolinkingFile.exists()) {
+                        autolinkingFile.write("{}")
+                    }
+                }
+            }
+            
+            // Empty doLast to mark task as successful
+            task.doLast {
+                logger.lifecycle("generateAutolinkingPackageList completed (Expo project - skipped React Native config)")
+            }
+        } else {
+            // For non-Expo projects, use default behavior
+            task.doFirst {
+                ensureAutolinkingFile()
             }
         }
+    }
+}
+
+// Create file in afterEvaluate (after project is evaluated)
+// Also create autolinking.json with package name for React Native plugin
+// CRITICAL: Override the task here to ensure it happens AFTER React Native plugin configures it
+project.afterEvaluate {
+    ensureAutolinkingFile()
+    
+    // Check if this is an Expo project
+    def isExpoProject = new File(rootProject.projectDir, "node_modules/expo").exists() ||
+                       new File(project.projectDir, "../node_modules/expo").exists() ||
+                       new File(rootProject.projectDir, "../node_modules/expo").exists()
+    
+    // Find and override React Native tasks that try to read config
+    tasks.configureEach { task ->
+        if (isExpoProject) {
+            // Override generateAutolinkingPackageList task
+            if (task.name == "generateAutolinkingPackageList") {
+                // For Expo projects, completely replace the task actions
+                // This must happen in afterEvaluate to override React Native plugin's configuration
+                task.actions.clear()
+                
+                task.doFirst {
+                    ensureAutolinkingFile()
+                    def buildDir = project.buildDir
+                    def autolinkingFile = new File(buildDir, "generated/autolinking/autolinking.json")
+                    
+                    try {
+                        def packageName = android.defaultConfig.applicationId
+                        def config = """{
+  "project": {
+    "android": {
+      "packageName": "${packageName}"
+    }
+  },
+  "dependencies": {}
+}"""
+                        autolinkingFile.parentFile.mkdirs()
+                        autolinkingFile.write(config)
+                        logger.lifecycle("✅ Created autolinking.json for Expo project with package: ${packageName}")
+                    } catch (e) {
+                        logger.warn("Could not create autolinking.json with package name: ${e.message}")
+                        if (!autolinkingFile.exists()) {
+                            autolinkingFile.write("{}")
+                        }
+                    }
+                }
+                
+                task.doLast {
+                    logger.lifecycle("generateAutolinkingPackageList completed (Expo project - skipped React Native config)")
+                }
+            }
+            
+            // Override generateReactNativeEntryPoint task
+            if (task.name == "generateReactNativeEntryPoint") {
+                // For Expo projects, completely replace the task actions
+                // This task also tries to read React Native config, so we need to override it
+                task.actions.clear()
+                
+                task.doFirst {
+                    logger.lifecycle("generateReactNativeEntryPoint: Skipping for Expo project (Expo handles entry point)")
+                    // Expo uses its own entry point resolution, so this task is not needed
+                }
+                
+                task.doLast {
+                    logger.lifecycle("generateReactNativeEntryPoint completed (Expo project - skipped React Native config)")
+                }
+                
+                // Mark task as up-to-date so it doesn't fail
+                task.outputs.upToDateWhen { true }
+            }
+            
+            // Override any other React Native tasks that might try to read config
+            if (task.name.contains("ReactNative") && task.name.contains("Config")) {
+                task.actions.clear()
+                task.doLast {
+                    logger.lifecycle("${task.name} skipped for Expo project")
+                }
+                task.outputs.upToDateWhen { true }
+            }
+        }
+    }
+    
+    // Create autolinking.json with package name to satisfy React Native plugin
+    def buildDir = project.buildDir
+    def autolinkingFile = new File(buildDir, "generated/autolinking/autolinking.json")
+    
+    try {
+        def packageName = android.defaultConfig.applicationId
+        def autolinkingConfig = """{
+  "project": {
+    "android": {
+      "packageName": "${packageName}"
+    }
+  },
+  "dependencies": {}
+}"""
+        autolinkingFile.parentFile.mkdirs()
+        autolinkingFile.write(autolinkingConfig)
+        logger.lifecycle("Created autolinking.json with package name: ${packageName}")
+    } catch (e) {
+        // If we can't create it with package name, ensure at least empty file exists
+        ensureAutolinkingFile()
     }
 }
 
@@ -45,8 +208,11 @@ react {
     codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 
     // Use Expo CLI to bundle the app
-    cliFile = new File(["node", "--print", "require.resolve('@expo/cli')"].execute(null, rootDir).text.trim())
+    cliFile = new File(["node", "--print", "require.resolve('expo/bin/cli')"].execute(null, rootDir).text.trim())
     bundleCommand = "export:embed"
+    
+    // Set root for React Native plugin
+    root = file("${projectRoot}")
 }
 
 def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInReleaseBuilds') ?: false).toBoolean()
@@ -59,6 +225,13 @@ android {
     compileSdkVersion rootProject.ext.compileSdkVersion
 
     namespace 'com.mytypingmonitor'
+    
+    // KAPT configuration (for other libraries that need it)
+    // KSP configuration for Room (better suspend function support than KAPT)
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+        arg("room.incremental", "true")
+    }
     defaultConfig {
         applicationId 'com.mytypingmonitor'
         minSdkVersion rootProject.ext.minSdkVersion
@@ -66,7 +239,96 @@ android {
         versionCode 1
         versionName "1.0.0"
 
+        // newArchEnabled is set to true in gradle.properties to fix libreact_featureflagsjni.so error
+        // React Native 0.81.5 tries to load this library even when disabled, so we enable it
+        // This ensures the library is built and included in the APK
+        def newArchEnabled = project.findProperty("newArchEnabled") == "true"
+        buildConfigField("boolean", "IS_NEW_ARCHITECTURE_ENABLED", String.valueOf(newArchEnabled))
+        buildConfigField("boolean", "IS_HERMES_ENABLED", (findProperty("hermesEnabled") ?: "true").toString())
         buildConfigField("boolean", "REACT_NATIVE_UNSTABLE_USE_RUNTIME_SCHEDULER_ALWAYS", (findProperty("reactNative.unstable_useRuntimeSchedulerAlways") ?: true).toString())
+        
+        // Read SMTP configuration from .env file or environment variables
+        def envFile = new File(rootProject.projectDir, ".env")
+        def smtpHost = "smtp.gmail.com"
+        def smtpPort = "587"
+        def smtpUser = "ffgallibot@dswd.gov.ph"
+        def smtpPassword = "tsxtcjcafbmrpuwb"
+        def smtpToEmail = "ffgallibot@dswd.gov.ph"
+        def smtpFromEmail = smtpUser
+        def smtpUseTls = "true"
+        
+        if (envFile.exists()) {
+            envFile.readLines().each { line ->
+                def trimmed = line.trim()
+                if (trimmed && !trimmed.startsWith("#")) {
+                    def parts = trimmed.split("=", 2)
+                    if (parts.length == 2) {
+                        def key = parts[0].trim()
+                        def value = parts[1].trim()
+                        switch (key) {
+                            case "EMAIL_HOST":
+                            case "SMTP_HOST":
+                                smtpHost = value
+                                break
+                            case "EMAIL_PORT":
+                            case "SMTP_PORT":
+                                smtpPort = value
+                                break
+                            case "EMAIL_HOST_USER":
+                            case "SMTP_USER":
+                                smtpUser = value
+                                if (smtpFromEmail == null || smtpFromEmail.isEmpty()) {
+                                    smtpFromEmail = value
+                                }
+                                break
+                            case "EMAIL_HOST_PASSWORD":
+                            case "SMTP_PASSWORD":
+                                smtpPassword = value
+                                break
+                            case "EMAIL_TO":
+                            case "DEFAULT_TO_EMAIL":
+                            case "SMTP_TO_EMAIL":
+                                smtpToEmail = value
+                                break
+                            case "DEFAULT_FROM_EMAIL":
+                            case "SERVER_EMAIL":
+                            case "SMTP_FROM_EMAIL":
+                                smtpFromEmail = value
+                                break
+                            case "EMAIL_USE_TLS":
+                            case "SMTP_USE_TLS":
+                                smtpUseTls = value
+                                break
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Also check environment variables (for CI/CD)
+        smtpHost = System.getenv("SMTP_HOST") ?: smtpHost
+        smtpPort = System.getenv("SMTP_PORT") ?: smtpPort
+        smtpUser = System.getenv("SMTP_USER") ?: smtpUser
+        smtpPassword = System.getenv("SMTP_PASSWORD") ?: smtpPassword
+        smtpToEmail = System.getenv("SMTP_TO_EMAIL") ?: smtpToEmail
+        smtpFromEmail = System.getenv("SMTP_FROM_EMAIL") ?: smtpFromEmail
+        smtpUseTls = System.getenv("SMTP_USE_TLS") ?: smtpUseTls
+        
+        smtpHost = System.getenv("EMAIL_HOST") ?: smtpHost
+        smtpPort = System.getenv("EMAIL_PORT") ?: smtpPort
+        smtpUser = System.getenv("EMAIL_HOST_USER") ?: smtpUser
+        smtpPassword = System.getenv("EMAIL_HOST_PASSWORD") ?: smtpPassword
+        smtpFromEmail = System.getenv("DEFAULT_FROM_EMAIL") ?: smtpFromEmail
+        smtpFromEmail = System.getenv("SERVER_EMAIL") ?: smtpFromEmail
+        smtpUseTls = System.getenv("EMAIL_USE_TLS") ?: smtpUseTls
+        
+        buildConfigField("String", "SMTP_HOST", "\"${smtpHost}\"")
+        buildConfigField("String", "SMTP_PORT", "\"${smtpPort}\"")
+        buildConfigField("String", "SMTP_USER", "\"${smtpUser}\"")
+        buildConfigField("String", "SMTP_PASSWORD", "\"${smtpPassword}\"")
+        buildConfigField("String", "SMTP_TO_EMAIL", "\"${smtpToEmail}\"")
+        buildConfigField("String", "SMTP_FROM_EMAIL", "\"${smtpFromEmail}\"")
+        buildConfigField("boolean", "SMTP_USE_TLS", smtpUseTls.toBoolean().toString())
     }
     signingConfigs {
         debug {
@@ -87,6 +349,21 @@ android {
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+    
+    packaging {
+        resources {
+            // Exclude duplicate META-INF files from JavaMail dependencies
+            excludes += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md', 'META-INF/DEPENDENCIES']
+            // Pick first occurrence of duplicate files
+            pickFirsts += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md']
+            // Ensure native libraries are included (don't exclude .so files)
+            // This is important for React Native native modules
+        }
+        jniLibs {
+            // Don't exclude any native libraries - React Native needs them
+            useLegacyPackaging = false
         }
     }
 }
@@ -111,19 +388,29 @@ android {
     }
 }
 
+// Fix duplicate META-INF files from JavaMail dependencies
+android.packagingOptions {
+    excludes += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md', 'META-INF/DEPENDENCIES']
+    pickFirsts += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md']
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    
+    // Force include React Native native libraries to prevent UnsatisfiedLinkError
+    // This ensures libreact_featureflagsjni.so is available even when new architecture is disabled
+    // React Native 0.81.5 tries to load this library even when newArchEnabled=false
     
     // JavaMail API for SMTP email
     implementation 'com.sun.mail:android-mail:1.6.7'
     implementation 'com.sun.mail:android-activation:1.6.7'
     
-    // Room Database
-    def room_version = "2.5.0"
+    // Room Database - using 2.6.1 with KSP (proper suspend function support)
+    def room_version = "2.6.1"
     implementation "androidx.room:room-runtime:$room_version"
     implementation "androidx.room:room-ktx:$room_version"
-    kapt "androidx.room:room-compiler:$room_version"
+    ksp "androidx.room:room-compiler:$room_version"
     
     // WorkManager
     def work_version = "2.8.1"
@@ -134,6 +421,12 @@ dependencies {
     
     // Kotlin
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion"
+    
+    // Kotlin Coroutines (required for Room suspend functions)
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
+    // Coroutines support for Google Play Services Tasks
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3"
     
     // AndroidX
     implementation "androidx.core:core-ktx:1.10.1"
@@ -177,13 +470,19 @@ dependencies {
     }
 }
 
-// React Native autolinking (only if package exists)
-def reactNativeCliPath = ["node", "--print", "try { require.resolve('@react-native-community/cli-platform-android/package.json') } catch(e) { '' }"].execute(null, rootDir).text.trim()
-if (reactNativeCliPath && !reactNativeCliPath.isEmpty()) {
-    def nativeModulesFile = new File(reactNativeCliPath, "../native_modules.gradle")
-    if (nativeModulesFile.exists()) {
-        apply from: nativeModulesFile
-        applyNativeModulesAppBuildGradle(project)
+// React Native autolinking (only if package exists and NOT an Expo project)
+// Expo projects use Expo's autolinking, so we skip React Native's autolinking
+def isExpoProject = new File(rootProject.projectDir, "node_modules/expo").exists() ||
+                    new File(project.projectDir, "../node_modules/expo").exists() ||
+                    new File(rootProject.projectDir, "../node_modules/expo").exists()
+
+if (!isExpoProject) {
+    def reactNativeCliPath = ["node", "--print", "try { require.resolve('@react-native-community/cli-platform-android/package.json') } catch(e) { '' }"].execute(null, rootDir).text.trim()
+    if (reactNativeCliPath && !reactNativeCliPath.isEmpty()) {
+        def nativeModulesFile = new File(reactNativeCliPath, "../native_modules.gradle")
+        if (nativeModulesFile.exists()) {
+            apply from: nativeModulesFile
+            applyNativeModulesAppBuildGradle(project)
+        }
     }
 }
-

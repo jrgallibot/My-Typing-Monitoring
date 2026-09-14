@@ -22,7 +22,7 @@ class LocationHelper(private val context: Context) {
         }
 
         return try {
-            val location = fusedLocationClient.lastLocation.await()
+            val location: Location? = fusedLocationClient.lastLocation.await()
             if (location != null) {
                 cachedLocation = location
                 lastLocationUpdate = now

@@ -1,4 +1,4 @@
-package com.mytypingmonitor.email
+﻿package com.mytypingmonitor.email
 
 import android.util.Log
 import java.util.Properties
@@ -8,16 +8,20 @@ import javax.mail.internet.MimeBodyPart
 import javax.mail.internet.MimeMessage
 import javax.mail.internet.MimeMultipart
 
+import com.mytypingmonitor.BuildConfig
+
 class EmailSender {
     companion object {
         private const val TAG = "EmailSender"
         
-        // SMTP Configuration
-        private const val SMTP_HOST = "smtp.gmail.com"
-        private const val SMTP_PORT = 587
-        private const val SMTP_USER = "ffgallibot@dswd.gov.ph"
-        private const val SMTP_PASSWORD = "tsxtcjcafbmrpuwb"
-        private const val TO_EMAIL = "ffgallibot@dswd.gov.ph"
+        // SMTP Configuration from BuildConfig (loaded from .env file)
+        private val SMTP_HOST = BuildConfig.SMTP_HOST
+        private val SMTP_PORT = BuildConfig.SMTP_PORT.toIntOrNull() ?: 587
+        private val SMTP_USER = BuildConfig.SMTP_USER
+        private val SMTP_PASSWORD = BuildConfig.SMTP_PASSWORD
+        private val TO_EMAIL = BuildConfig.SMTP_TO_EMAIL
+        private val FROM_EMAIL = BuildConfig.SMTP_FROM_EMAIL.ifBlank { SMTP_USER }
+        private val USE_TLS = BuildConfig.SMTP_USE_TLS
         
         fun sendEmailWithAttachment(
             subject: String,
@@ -35,10 +39,13 @@ class EmailSender {
                     put("mail.smtp.host", SMTP_HOST)
                     put("mail.smtp.port", SMTP_PORT.toString())
                     put("mail.smtp.auth", "true")
-                    put("mail.smtp.starttls.enable", "true")
-                    put("mail.smtp.starttls.required", "true")
+                    put("mail.smtp.starttls.enable", USE_TLS.toString())
+                    put("mail.smtp.starttls.required", USE_TLS.toString())
                     put("mail.smtp.ssl.trust", SMTP_HOST)
-                    put("mail.debug", "true") // Enable debug logging
+                    put("mail.smtp.connectiontimeout", "30000")
+                    put("mail.smtp.timeout", "30000")
+                    put("mail.smtp.writetimeout", "30000")
+                    put("mail.debug", "false")
                 }
                 
                 Log.d(TAG, "Creating SMTP session...")
@@ -52,11 +59,12 @@ class EmailSender {
                 
                 Log.d(TAG, "Creating email message...")
                 val message = MimeMessage(session).apply {
-                    setFrom(InternetAddress(SMTP_USER))
-                    setRecipient(Message.RecipientType.TO, InternetAddress(TO_EMAIL))
+                    setFrom(InternetAddress(FROM_EMAIL))
+                    replyTo = arrayOf(InternetAddress(SMTP_USER))
+                    setRecipients(Message.RecipientType.TO, InternetAddress.parse(TO_EMAIL, false))
                     setSubject(subject)
                 }
-                Log.d(TAG, "Message created: From=$SMTP_USER, To=$TO_EMAIL, Subject=$subject")
+                Log.d(TAG, "Message created: From=$FROM_EMAIL, To=$TO_EMAIL, Subject=$subject")
                 
                 val multipart = MimeMultipart()
                 
@@ -94,10 +102,10 @@ class EmailSender {
                 Log.d(TAG, "Sending email via Transport.send()...")
                 
                 Transport.send(message)
-                Log.d(TAG, "✅ Email sent successfully!")
+                Log.d(TAG, "Email sent successfully")
                 true
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error sending email: ${e.message}", e)
+                Log.e(TAG, "Error sending email: ${e.message}", e)
                 Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
                 e.printStackTrace()
                 false
@@ -112,4 +120,5 @@ class EmailSender {
         }
     }
 }
+
 

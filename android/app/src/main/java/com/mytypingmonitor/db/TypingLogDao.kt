@@ -20,8 +20,8 @@ interface TypingLogDao {
     @Query("SELECT COUNT(*) FROM typing_logs")
     suspend fun getTotalCount(): Int
 
-    @Query("SELECT SUM(LENGTH(text)) FROM typing_logs")
-    suspend fun getTotalCharacters(): Long?
+    @Query("SELECT COALESCE(SUM(LENGTH(text)), 0) FROM typing_logs")
+    suspend fun getTotalCharacters(): Long
 
     @Query("SELECT appPackage, COUNT(*) as count FROM typing_logs GROUP BY appPackage ORDER BY count DESC LIMIT 10")
     suspend fun getMostUsedApps(): List<AppUsage>
@@ -30,13 +30,13 @@ interface TypingLogDao {
     suspend fun insertLog(log: TypingLogEntity): Long
 
     @Update
-    suspend fun updateLog(log: TypingLogEntity)
+    suspend fun updateLog(log: TypingLogEntity): Int
 
     @Query("UPDATE typing_logs SET isSent = 1 WHERE id IN (:ids)")
-    suspend fun markAsSent(ids: List<Long>)
+    suspend fun markAsSent(ids: List<Long>): Int
 
     @Query("DELETE FROM typing_logs WHERE isSent = 1 AND timestamp < :beforeTimestamp")
-    suspend fun deleteOldSentLogs(beforeTimestamp: Long)
+    suspend fun deleteOldSentLogs(beforeTimestamp: Long): Int
 }
 
 data class AppUsage(

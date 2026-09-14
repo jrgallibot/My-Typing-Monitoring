@@ -2,23 +2,47 @@
 
 buildscript {
     ext {
-        buildToolsVersion = findProperty('android.buildToolsVersion') ?: '33.0.0'
-        minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '21')
-        compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '33')
-        targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '33')
-        kotlinVersion = findProperty('android.kotlinVersion') ?: '1.8.10'
+        buildToolsVersion = findProperty('android.buildToolsVersion') ?: '34.0.0'
+        minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '24')
+        compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '34')
+        targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '34')
+        kotlinVersion = findProperty('android.kotlinVersion') ?: '2.1.20'
         frescoVersion = findProperty('expo.frescoVersion') ?: '2.5.0'
 
-        // We use NDK 23 which has both M1 support and is the side-by-side NDK version from AGP.
-        ndkVersion = "23.1.7779620"
+        // NDK 27 (r27d LTS) required for React Native 0.81 new architecture C++20 build.
+        // NDK 23 lacks std::regular, std::identity in libc++; causes F14Table.h/fnv1a.h build errors.
+        ndkVersion = "27.3.13750724"
     }
     repositories {
         google()
         mavenCentral()
+        gradlePluginPortal()
+        maven { url 'https://plugins.gradle.org/m2/' }
     }
     dependencies {
         classpath('com.android.tools.build:gradle:7.4.2')
         classpath('com.facebook.react:react-native-gradle-plugin')
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+        // KSP for Room (better suspend function support than KAPT)
+        // KSP version 2.1.20-1.0.32 is compatible with Kotlin 2.1.20
+        classpath("com.google.devtools.ksp:symbol-processing-gradle-plugin:2.1.20-1.0.32")
+    }
+}
+
+// Configure ALL subprojects to inherit plugin repositories
+// This ensures expo-dev-launcher can find the Kotlin Compose plugin
+subprojects {
+    afterEvaluate { project ->
+        // Add gradlePluginPortal to buildscript repositories if not present
+        def hasGradlePluginPortal = project.buildscript.repositories.any { repo ->
+            repo.name?.contains('Gradle') || repo.url?.toString()?.contains('plugins.gradle.org')
+        }
+        if (!hasGradlePluginPortal) {
+            project.buildscript.repositories {
+                gradlePluginPortal()
+                maven { url 'https://plugins.gradle.org/m2/' }
+            }
+        }
     }
 }
 
@@ -36,6 +60,7 @@ allprojects {
         google()
         mavenCentral()
         maven { url 'https://www.jitpack.io' }
+        gradlePluginPortal()
     }
 }
 

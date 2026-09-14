@@ -36,8 +36,8 @@ class PdfGenerator(
         
         val document = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 size
-        val page = document.startPage(pageInfo)
-        val canvas = page.canvas
+        var page = document.startPage(pageInfo)
+        var canvas = page.canvas
         
         val paint = android.graphics.Paint().apply {
             color = android.graphics.Color.BLACK
@@ -92,9 +92,13 @@ class PdfGenerator(
                 document.finishPage(page)
                 currentPage++
                 val newPageInfo = PdfDocument.PageInfo.Builder(595, 842, currentPage).create()
-                val newPage = document.startPage(newPageInfo)
-                canvas.setBitmap(newPage.canvas)
+                page = document.startPage(newPageInfo)
+                canvas = page.canvas
+                // Continue drawing on new page
                 y = 50f
+                // Draw title on new page
+                canvas.drawText("Typing Logs Report (continued)", margin, y, titlePaint)
+                y += lineHeight * 2
             }
             
             val decryptedText = try {

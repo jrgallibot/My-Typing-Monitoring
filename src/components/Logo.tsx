@@ -7,31 +7,46 @@ interface LogoProps {
   variant?: 'light' | 'dark';
 }
 
-const Logo: React.FC<LogoProps> = ({size = 'medium', showText = true, variant = 'dark'}) => {
+const Logo: React.FC<LogoProps> = ({
+  size = 'medium',
+  showText = true,
+  variant = 'dark',
+}) => {
   const sizeMap = {
-    small: {icon: 24, text: 14, container: 40},
-    medium: {icon: 48, text: 18, container: 80},
-    large: {icon: 72, text: 24, container: 120},
+    small: {mark: 38, text: 14},
+    medium: {mark: 58, text: 18},
+    large: {mark: 82, text: 25},
   };
 
   const dimensions = sizeMap[size];
-  const textColor = variant === 'light' ? '#fff' : '#1a1a1a';
-  const taglineColor = variant === 'light' ? 'rgba(255, 255, 255, 0.8)' : '#666';
+  const textColor = variant === 'light' ? '#fff' : '#111827';
+  const taglineColor = variant === 'light' ? 'rgba(255, 255, 255, 0.78)' : '#64748b';
 
   return (
     <View style={styles.container}>
-      <View style={[styles.logoContainer, {width: dimensions.container, height: dimensions.container}]}>
-        <View style={styles.keyboardIcon}>
-          <Text style={[styles.iconText, {fontSize: dimensions.icon}]}>⌨️</Text>
+      <View style={[styles.logoContainer, {width: dimensions.mark, height: dimensions.mark}]}>
+        <View style={styles.keyRows}>
+          <View style={styles.keyRow}>
+            <View style={styles.key} />
+            <View style={styles.keyWide} />
+            <View style={styles.key} />
+          </View>
+          <View style={styles.keyRow}>
+            <View style={styles.keyWide} />
+            <View style={styles.key} />
+            <View style={styles.keyWide} />
+          </View>
         </View>
-        <View style={styles.monitorIcon}>
-          <Text style={[styles.monitorText, {fontSize: dimensions.icon * 0.6}]}>📊</Text>
-        </View>
+        <View style={styles.pulseLine} />
       </View>
       {showText && (
         <View style={styles.textContainer}>
-          <Text style={[styles.appName, {fontSize: dimensions.text, color: textColor}]}>MyTypingMonitor</Text>
-          <Text style={[styles.tagline, {fontSize: dimensions.text * 0.7, color: taglineColor}]}>Track • Analyze • Secure</Text>
+          <Text style={[styles.appName, {fontSize: dimensions.text, color: textColor}]}>
+            MyTypingMonitor
+          </Text>
+          <Text style={[styles.tagline, {fontSize: dimensions.text * 0.68, color: taglineColor}]}>
+            Track. Analyze. Secure.
+          </Text>
         </View>
       )}
     </View>
@@ -44,48 +59,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoContainer: {
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
   },
-  keyboardIcon: {
-    position: 'absolute',
-    zIndex: 2,
+  keyRows: {
+    gap: 4,
   },
-  iconText: {
-    textAlign: 'center',
+  keyRow: {
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
   },
-  monitorIcon: {
-    position: 'absolute',
-    top: 8,
-    right: -8,
-    zIndex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  key: {
+    width: 8,
+    height: 6,
+    borderRadius: 2,
+    backgroundColor: '#fff',
+    opacity: 0.92,
   },
-  monitorText: {
-    textAlign: 'center',
+  keyWide: {
+    width: 14,
+    height: 6,
+    borderRadius: 2,
+    backgroundColor: '#fff',
+    opacity: 0.92,
+  },
+  pulseLine: {
+    width: '52%',
+    height: 3,
+    borderRadius: 4,
+    marginTop: 7,
+    backgroundColor: '#38bdf8',
   },
   textContainer: {
     alignItems: 'center',
     marginTop: 4,
   },
   appName: {
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    letterSpacing: 0,
   },
   tagline: {
     marginTop: 2,
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 0,
   },
 });
 
 export default Logo;
-

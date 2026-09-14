@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Keyboard/Typing Monitor Icon -->
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,54m-50,0a50,50 0,1 1,100 0a50,50 0,1 1,-100 0"/>
+    
+    <!-- Monitor/Screen representation above keyboard -->
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M25,15 L83,15 Q85,15 85,17 L85,25 Q85,27 83,27 L25,27 Q23,27 23,25 L23,17 Q23,15 25,15 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M27,17 L81,17 L81,23 L27,23 Z"/>
+    
+    <!-- Typing indicator (dots) - using paths instead of circles -->
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M35,20m-1.5,0a1.5,1.5 0,1 1,3 0a1.5,1.5 0,1 1,-3 0"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M42,20m-1.5,0a1.5,1.5 0,1 1,3 0a1.5,1.5 0,1 1,-3 0"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M49,20m-1.5,0a1.5,1.5 0,1 1,3 0a1.5,1.5 0,1 1,-3 0"/>
+    
+    <!-- Keyboard keys representation using paths (rounded rectangles) -->
+    <!-- Top row -->
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M20,30 Q20,30 20,30 L32,30 Q33,30 33,31 L33,38 Q33,39 32,39 L20,39 Q19,39 19,38 L19,31 Q19,30 20,30 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M35,30 Q35,30 35,30 L47,30 Q48,30 48,31 L48,38 Q48,39 47,39 L35,39 Q34,39 34,38 L34,31 Q34,30 35,30 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M50,30 Q50,30 50,30 L62,30 Q63,30 63,31 L63,38 Q63,39 62,39 L50,39 Q49,39 49,38 L49,31 Q49,30 50,30 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M65,30 Q65,30 65,30 L77,30 Q78,30 78,31 L78,38 Q78,39 77,39 L65,39 Q64,39 64,38 L64,31 Q64,30 65,30 Z"/>
+    
+    <!-- Middle row -->
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M25,42 Q25,42 25,42 L37,42 Q38,42 38,43 L38,50 Q38,51 37,51 L25,51 Q24,51 24,50 L24,43 Q24,42 25,42 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M40,42 Q40,42 40,42 L52,42 Q53,42 53,43 L53,50 Q53,51 52,51 L40,51 Q39,51 39,50 L39,43 Q39,42 40,42 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M55,42 Q55,42 55,42 L67,42 Q68,42 68,43 L68,50 Q68,51 67,51 L55,51 Q54,51 54,50 L54,43 Q54,42 55,42 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M70,42 Q70,42 70,42 L82,42 Q83,42 83,43 L83,50 Q83,51 82,51 L70,51 Q69,51 69,50 L69,43 Q69,42 70,42 Z"/>
+    
+    <!-- Bottom row -->
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M20,54 Q20,54 20,54 L40,54 Q41,54 41,55 L41,62 Q41,63 40,63 L20,63 Q19,63 19,62 L19,55 Q19,54 20,54 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M45,54 Q45,54 45,54 L57,54 Q58,54 58,55 L58,62 Q58,63 57,63 L45,63 Q44,63 44,62 L44,55 Q44,54 45,54 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M60,54 Q60,54 60,54 L72,54 Q73,54 73,55 L73,62 Q73,63 72,63 L60,63 Q59,63 59,62 L59,55 Q59,54 60,54 Z"/>
+    <path
+        android:fillColor="#023c69"
+        android:pathData="M75,54 Q75,54 75,54 L87,54 Q88,54 88,55 L88,62 Q88,63 87,63 L75,63 Q74,63 74,62 L74,55 Q74,54 75,54 Z"/>
+</vector>
